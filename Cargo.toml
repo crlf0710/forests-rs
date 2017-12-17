@@ -1,0 +1,10 @@
+[package]
+name = "forests"
+description = "Iteration traits for trees and forests in Rust."
+version = "0.0.1"
+authors = ["CrLF0710 <crlf0710@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/crlf0710/forests-rs"
+documentation = "https://docs.rs/forests"
+
+[dependencies]
