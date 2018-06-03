@@ -1,8 +1,8 @@
 #![allow(non_camel_case_types)]
 
-use std::mem;
-use std::marker::PhantomData;
 use super::navigator::*;
+use std::marker::PhantomData;
+use std::mem;
 
 const CURSOR_INVALID_POS: usize = ::std::usize::MAX;
 
@@ -26,7 +26,16 @@ impl node {
     }
 
     #[inline]
-    pub(crate) fn into_opt(self) -> Option<usize> {
+    pub(crate) fn into_opt_node(self) -> Option<node> {
+        if self.0 == CURSOR_INVALID_POS {
+            None
+        } else {
+            Some(self)
+        }
+    }
+
+    #[inline]
+    pub(crate) fn into_opt_idx(self) -> Option<usize> {
         if self.0 == CURSOR_INVALID_POS {
             None
         } else {
@@ -34,7 +43,6 @@ impl node {
         }
     }
 }
-
 
 #[derive(Clone)]
 pub(crate) struct ForestEntry<T> {
@@ -59,8 +67,7 @@ impl<T> ForestEntry<T> {
     }
 }
 
-
-pub struct forest<T>{
+pub struct forest<T> {
     data: [ForestEntry<T>],
 }
 
@@ -77,8 +84,8 @@ impl<T> forest<T> {
         IterMut::new(self)
     }
 
-    pub(crate) fn get_inner_ptr(&self, cursor:node) -> * const T {
-        if let Some(idx) = cursor.into_opt() {
+    pub(crate) fn get_inner_ptr(&self, cursor: node) -> *const T {
+        if let Some(idx) = cursor.into_opt_idx() {
             unsafe {
                 let entry: &ForestEntry<T> = self.data.get_unchecked(idx);
                 &entry.data
@@ -88,8 +95,8 @@ impl<T> forest<T> {
         }
     }
 
-    pub(crate) fn get_inner_ptr_mut(&mut self, cursor:node) -> * mut T {
-        if let Some(idx) = cursor.into_opt() {
+    pub(crate) fn get_inner_ptr_mut(&mut self, cursor: node) -> *mut T {
+        if let Some(idx) = cursor.into_opt_idx() {
             unsafe {
                 let entry: &mut ForestEntry<T> = self.data.get_unchecked_mut(idx);
                 &mut entry.data
@@ -107,12 +114,18 @@ struct ForestRefRepr<T> {
 }
 
 #[inline]
-pub(crate) unsafe fn forest_ref_from_raw_parts<'a, T>(p: *const ForestEntry<T>, len: usize) -> &'a forest<T> {
+pub(crate) unsafe fn forest_ref_from_raw_parts<'a, T>(
+    p: *const ForestEntry<T>,
+    len: usize,
+) -> &'a forest<T> {
     mem::transmute(ForestRefRepr { data: p, len: len })
 }
 
 #[inline]
-pub(crate) unsafe fn forest_ref_from_raw_parts_mut<'a, T>(p: *mut ForestEntry<T>, len: usize) -> &'a mut forest<T> {
+pub(crate) unsafe fn forest_ref_from_raw_parts_mut<'a, T>(
+    p: *mut ForestEntry<T>,
+    len: usize,
+) -> &'a mut forest<T> {
     mem::transmute(ForestRefRepr { data: p, len: len })
 }
 
@@ -139,7 +152,6 @@ pub enum IterMovement {
     LeftDownLastN(usize),
 }
 
-
 impl IterMovement {
     fn join(self, other: Self) -> Self {
         match (self, other) {
@@ -148,7 +160,9 @@ impl IterMovement {
             (_, IterMovement::GotoStart) => IterMovement::GotoStart,
             (_, IterMovement::GotoEnd) => IterMovement::GotoEnd,
             (IterMovement::Up(a), IterMovement::Up(b)) => IterMovement::Up(a + b),
-            (IterMovement::DownFirst(a), IterMovement::DownFirst(b)) => IterMovement::DownFirst(a + b),
+            (IterMovement::DownFirst(a), IterMovement::DownFirst(b)) => {
+                IterMovement::DownFirst(a + b)
+            }
             (IterMovement::DownLast(a), IterMovement::DownLast(b)) => IterMovement::DownLast(a + b),
             (IterMovement::Up(a), IterMovement::Left) => IterMovement::UpNLeft(a),
             (IterMovement::Up(a), IterMovement::Right) => IterMovement::UpNRight(a),
@@ -156,13 +170,16 @@ impl IterMovement {
             (IterMovement::Up(a), IterMovement::UpNRight(b)) => IterMovement::UpNRight(a + b),
             (IterMovement::Left, IterMovement::DownLast(a)) => IterMovement::LeftDownLastN(a),
             (IterMovement::Right, IterMovement::DownFirst(a)) => IterMovement::RightDownFirstN(a),
-            (IterMovement::LeftDownLastN(a), IterMovement::DownLast(b)) => IterMovement::LeftDownLastN(a + b),
-            (IterMovement::RightDownFirstN(a), IterMovement::DownFirst(b)) => IterMovement::RightDownFirstN(a + b),
+            (IterMovement::LeftDownLastN(a), IterMovement::DownLast(b)) => {
+                IterMovement::LeftDownLastN(a + b)
+            }
+            (IterMovement::RightDownFirstN(a), IterMovement::DownFirst(b)) => {
+                IterMovement::RightDownFirstN(a + b)
+            }
             _ => panic!("can't merge iterator movement {:?} and {:?}", self, other),
         }
     }
 }
-
 
 pub struct Iter<'a, T: 'a> {
     data: &'a forest<T>,
@@ -191,7 +208,10 @@ impl<'a, T: 'a> Iter<'a, T> {
     }
 
     pub fn values(self) -> Values<&'a T, Self> {
-        Values {iter: self, phantom: PhantomData}
+        Values {
+            iter: self,
+            phantom: PhantomData,
+        }
     }
 
     pub fn last_visited_node(&self) -> Option<node> {
@@ -218,7 +238,10 @@ impl<'a, T> IterMut<'a, T> {
     }
 
     pub fn values(self) -> Values<&'a mut T, Self> {
-        Values {iter: self, phantom: PhantomData}
+        Values {
+            iter: self,
+            phantom: PhantomData,
+        }
     }
 
     pub fn last_visited_node(&self) -> Option<node> {
@@ -236,7 +259,6 @@ pub(crate) enum IterDir {
     Prev,
 }
 
-
 impl<T> forest<T> {
     pub(crate) fn top_first_entry(&self) -> node {
         if self.len() == 0 {
@@ -247,7 +269,7 @@ impl<T> forest<T> {
             loop {
                 let cur_entry = &self.data[cur_idx];
                 let parent_cursor = cur_entry.parent;
-                if let Some(parent_idx) = parent_cursor.into_opt() {
+                if let Some(parent_idx) = parent_cursor.into_opt_idx() {
                     cur_idx = parent_idx;
                 } else {
                     break;
@@ -257,7 +279,7 @@ impl<T> forest<T> {
             loop {
                 let cur_entry = &self.data[cur_idx];
                 let prev_cursor = cur_entry.prev;
-                if let Some(prev_idx) = prev_cursor.into_opt() {
+                if let Some(prev_idx) = prev_cursor.into_opt_idx() {
                     cur_idx = prev_idx;
                 } else {
                     break;
@@ -275,48 +297,45 @@ impl<T> forest<T> {
         }
 
         match pos {
-            SeekPos::TopLast | SeekPos::BottomLast => {
-                loop {
-                    let cur_entry = &self.data[cur.into_opt().unwrap()];
-                    let next_cursor = cur_entry.next;
-                    if next_cursor.is_invalid() {
-                        break;
-                    }
-                    cur = next_cursor;
+            SeekPos::TopLast | SeekPos::BottomLast => loop {
+                let cur_entry = &self.data[cur.into_opt_idx().unwrap()];
+                let next_cursor = cur_entry.next;
+                if next_cursor.is_invalid() {
+                    break;
                 }
+                cur = next_cursor;
             },
-            SeekPos::TopFirst | SeekPos::BottomFirst => {},
+            SeekPos::TopFirst | SeekPos::BottomFirst => {}
         }
 
         match pos {
-            SeekPos::TopFirst | SeekPos::TopLast => {},
-            SeekPos::BottomFirst => {
-                loop {
-                    let cur_entry = &self.data[cur.into_opt().unwrap()];
-                    let child_cursor = cur_entry.child_first;
-                    if child_cursor.is_invalid() {
-                        break;
-                    }
-                    cur = child_cursor;
+            SeekPos::TopFirst | SeekPos::TopLast => {}
+            SeekPos::BottomFirst => loop {
+                let cur_entry = &self.data[cur.into_opt_idx().unwrap()];
+                let child_cursor = cur_entry.child_first;
+                if child_cursor.is_invalid() {
+                    break;
                 }
+                cur = child_cursor;
             },
-            SeekPos::BottomLast => {
-                loop {
-                    let cur_entry = &self.data[cur.into_opt().unwrap()];
-                    let child_cursor = cur_entry.child_last;
-                    if child_cursor.is_invalid() {
-                        break;
-                    }
-                    cur = child_cursor;
+            SeekPos::BottomLast => loop {
+                let cur_entry = &self.data[cur.into_opt_idx().unwrap()];
+                let child_cursor = cur_entry.child_last;
+                if child_cursor.is_invalid() {
+                    break;
                 }
+                cur = child_cursor;
             },
         }
         cur
     }
 
-    pub(crate) fn iterate_once(&self, (cursor, entry): (node, bool), dir: IterDir)
-        -> (IterMovement, (node, bool)) {
-        if let Some(idx) = cursor.into_opt() {
+    pub(crate) fn iterate_once(
+        &self,
+        (cursor, entry): (node, bool),
+        dir: IterDir,
+    ) -> (IterMovement, (node, bool)) {
+        if let Some(idx) = cursor.into_opt_idx() {
             let cur_entry = &self.data[idx];
             match (entry, dir) {
                 (true, IterDir::Next) => {
@@ -326,7 +345,7 @@ impl<T> forest<T> {
                     } else {
                         (IterMovement::DownFirst(1), (new_cursor, true))
                     }
-                },
+                }
                 (false, IterDir::Next) => {
                     let mut new_cursor = cur_entry.next;
                     if new_cursor.is_invalid() {
@@ -339,7 +358,7 @@ impl<T> forest<T> {
                     } else {
                         (IterMovement::Right, (new_cursor, true))
                     }
-                },
+                }
                 (true, IterDir::Prev) => {
                     let mut new_cursor = cur_entry.child_last;
                     if new_cursor.is_invalid() {
@@ -351,8 +370,8 @@ impl<T> forest<T> {
                         }
                     } else {
                         (IterMovement::DownLast(1), (new_cursor, false))
-                    }                    
-                },
+                    }
+                }
                 (false, IterDir::Prev) => {
                     let new_cursor = cur_entry.child_last;
                     if new_cursor.is_invalid() {
@@ -360,7 +379,7 @@ impl<T> forest<T> {
                     } else {
                         (IterMovement::DownLast(1), (new_cursor, false))
                     }
-                },                
+                }
             }
         } else {
             match (entry, dir) {
@@ -369,79 +388,71 @@ impl<T> forest<T> {
                     if new_cursor.is_invalid() {
                         (IterMovement::None, (cursor, entry))
                     } else {
-                        (IterMovement::DownFirst(1), (new_cursor, true))
+                        (IterMovement::DownFirst(0), (new_cursor, true))
                     }
-                },
+                }
                 (false, IterDir::Prev) => {
                     let new_cursor = self.seek_entry(SeekPos::TopLast);
                     if new_cursor.is_invalid() {
                         (IterMovement::None, (cursor, entry))
                     } else {
-                        (IterMovement::DownLast(1), (new_cursor, false))
+                        (IterMovement::DownLast(0), (new_cursor, false))
                     }
-                },
-                _ => {
-                    (IterMovement::None, (cursor, entry))
                 }
+                _ => (IterMovement::None, (cursor, entry)),
             }
         }
     }
 
-    pub(crate) fn iterate_entry(&self, (mut cur_cursor, mut cur_entry): (node, bool), dir: IterDir, mode: IterMode)
-        -> (IterMovement, (node, bool)) {
+    pub(crate) fn iterate_entry(
+        &self,
+        (mut cur_cursor, mut cur_entry): (node, bool),
+        dir: IterDir,
+        mode: IterMode,
+    ) -> (IterMovement, (node, bool)) {
         let mut movement = IterMovement::None;
         loop {
-            let (new_movement, (new_cursor, new_entry)) = self.iterate_once((cur_cursor, cur_entry), dir);
+            let (new_movement, (new_cursor, new_entry)) =
+                self.iterate_once((cur_cursor, cur_entry), dir);
             movement = movement.join(new_movement);
             cur_cursor = new_cursor;
             cur_entry = new_entry;
             match movement {
-                | IterMovement::GotoStart
-                | IterMovement::GotoEnd => {
+                | IterMovement::GotoStart | IterMovement::GotoEnd => {
                     return (movement, (cur_cursor, cur_entry));
                 }
                 _ => match (cur_entry, mode) {
-                    | (true, IterMode::PostOrder)
-                    | (false, IterMode::PreOrder) => continue,
+                    | (true, IterMode::PostOrder) | (false, IterMode::PreOrder) => continue,
                     _ => {
                         return (movement, (cur_cursor, cur_entry));
-                    },
+                    }
                 },
             }
         }
     }
 
-    pub(crate) fn navigate_entry(&self, cursor: node, dir: NavigateDir) 
-        -> Option<(node, bool)> {
-        let idx = cursor.into_opt()?;
+    pub(crate) fn navigate_entry(&self, cursor: node, dir: NavigateDir) -> Option<(node, bool)> {
+        let idx = cursor.into_opt_idx()?;
         let cur_entry = &self.data[idx];
         let (new_cursor_idx, new_entry) = match dir {
-            NavigateDir::Up(up_entry) => {
-                (cur_entry.parent.into_opt()?, up_entry)
-            },
-            NavigateDir::Down => {
-                (cur_entry.child_first.into_opt()?, true)
-            },
-            NavigateDir::Left => {
-                (cur_entry.prev.into_opt()?, true)
-            },
-            NavigateDir::Right => {
-                (cur_entry.next.into_opt()?, true)
-            },
+            NavigateDir::Up(up_entry) => (cur_entry.parent.into_opt_idx()?, up_entry),
+            NavigateDir::Down => (cur_entry.child_first.into_opt_idx()?, true),
+            NavigateDir::Left => (cur_entry.prev.into_opt_idx()?, true),
+            NavigateDir::Right => (cur_entry.next.into_opt_idx()?, true),
         };
         Some((unsafe { node::new_with_idx(new_cursor_idx) }, new_entry))
     }
-
 }
 
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = (IterMovement, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (movement, new_pair) = self.data.iterate_entry(self.cursor, IterDir::Next, self.mode);
+        let (movement, new_pair) = self.data
+            .iterate_entry(self.cursor, IterDir::Next, self.mode);
         self.cursor = new_pair;
 
-        let valueref = unsafe {self.data.get_inner_ptr(new_pair.0).as_ref()}?;
+        let valueref = unsafe { self.data.get_inner_ptr(new_pair.0).as_ref() }?;
 
         Some((movement, valueref))
     }
@@ -449,10 +460,11 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
 impl<'a, T> BiIterator for Iter<'a, T> {
     fn prev(&mut self) -> Option<Self::Item> {
-        let (movement, new_pair) = self.data.iterate_entry(self.cursor, IterDir::Prev, self.mode);
+        let (movement, new_pair) = self.data
+            .iterate_entry(self.cursor, IterDir::Prev, self.mode);
         self.cursor = new_pair;
 
-        let valueref = unsafe {self.data.get_inner_ptr(new_pair.0).as_ref()}?;
+        let valueref = unsafe { self.data.get_inner_ptr(new_pair.0).as_ref() }?;
 
         Some((movement, valueref))
     }
@@ -465,7 +477,7 @@ impl<'a, T> Navigator for Iter<'a, T> {
         let new_pair = self.data.navigate_entry(self.cursor.0, dir)?;
         self.cursor = new_pair;
 
-        let valueref = unsafe {self.data.get_inner_ptr(new_pair.0).as_ref()}?;
+        let valueref = unsafe { self.data.get_inner_ptr(new_pair.0).as_ref() }?;
         Some(valueref)
     }
 
@@ -484,20 +496,20 @@ impl<'a, T> Navigator for Iter<'a, T> {
         };
         self.cursor = (new_pos, new_entry);
 
-        let valueref = unsafe {self.data.get_inner_ptr(new_pos).as_ref()}?;
+        let valueref = unsafe { self.data.get_inner_ptr(new_pos).as_ref() }?;
         Some(valueref)
     }
 }
-
 
 impl<'a, T: 'a> Iterator for IterMut<'a, T> {
     type Item = (IterMovement, &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (movement, new_pair) = self.data.iterate_entry(self.cursor, IterDir::Next, self.mode);
+        let (movement, new_pair) = self.data
+            .iterate_entry(self.cursor, IterDir::Next, self.mode);
         self.cursor = new_pair;
 
-        let valueref = unsafe {self.data.get_inner_ptr_mut(new_pair.0).as_mut()}?; 
+        let valueref = unsafe { self.data.get_inner_ptr_mut(new_pair.0).as_mut() }?;
 
         Some((movement, valueref))
     }
@@ -505,15 +517,15 @@ impl<'a, T: 'a> Iterator for IterMut<'a, T> {
 
 impl<'a, T: 'a> BiIterator for IterMut<'a, T> {
     fn prev(&mut self) -> Option<Self::Item> {
-        let (movement, new_pair) = self.data.iterate_entry(self.cursor, IterDir::Prev, self.mode);
+        let (movement, new_pair) = self.data
+            .iterate_entry(self.cursor, IterDir::Prev, self.mode);
         self.cursor = new_pair;
 
-        let valueref = unsafe {self.data.get_inner_ptr_mut(new_pair.0).as_mut()}?;
+        let valueref = unsafe { self.data.get_inner_ptr_mut(new_pair.0).as_mut() }?;
 
         Some((movement, valueref))
     }
 }
-
 
 impl<'a, T> Navigator for IterMut<'a, T> {
     type Item = &'a mut T;
@@ -522,7 +534,7 @@ impl<'a, T> Navigator for IterMut<'a, T> {
         let new_pair = self.data.navigate_entry(self.cursor.0, dir)?;
         self.cursor = new_pair;
 
-        let valueref = unsafe {self.data.get_inner_ptr_mut(new_pair.0).as_mut()}?;
+        let valueref = unsafe { self.data.get_inner_ptr_mut(new_pair.0).as_mut() }?;
         Some(valueref)
     }
 
@@ -541,7 +553,7 @@ impl<'a, T> Navigator for IterMut<'a, T> {
         };
         self.cursor = (new_pos, new_entry);
 
-        let valueref = unsafe {self.data.get_inner_ptr_mut(new_pos).as_mut()}?;
+        let valueref = unsafe { self.data.get_inner_ptr_mut(new_pos).as_mut() }?;
         Some(valueref)
     }
 }
@@ -552,20 +564,20 @@ pub struct Values<V, T> {
     phantom: PhantomData<V>,
 }
 
-impl<V, T: Iterator<Item=(IterMovement, V)>> Iterator for Values<V, T> {
+impl<V, T: Iterator<Item = (IterMovement, V)>> Iterator for Values<V, T> {
     type Item = V;
     fn next(&mut self) -> Option<V> {
         self.iter.next().map(|x| x.1)
     }
 }
 
-impl<V, T: BiIterator<Item=(IterMovement, V)>> BiIterator for Values<V, T> {
+impl<V, T: BiIterator<Item = (IterMovement, V)>> BiIterator for Values<V, T> {
     fn prev(&mut self) -> Option<V> {
         self.iter.prev().map(|x| x.1)
     }
 }
 
-impl<V, T: Navigator<Item=V>> Navigator for Values<V, T> {
+impl<V, T: Navigator<Item = V>> Navigator for Values<V, T> {
     type Item = V;
 
     fn navigate(&mut self, dir: NavigateDir) -> Option<Self::Item> {

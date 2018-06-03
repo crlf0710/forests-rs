@@ -14,7 +14,7 @@ pub enum NavigateDir {
     Right,
 }
 
-pub trait BiIterator : Iterator {
+pub trait BiIterator: Iterator {
     fn prev(&mut self) -> Option<Self::Item>;
 }
 
@@ -32,7 +32,7 @@ pub trait Navigator {
     fn right(&mut self) -> Option<Self::Item> {
         self.navigate(NavigateDir::Right)
     }
-    
+
     fn left(&mut self) -> Option<Self::Item> {
         self.navigate(NavigateDir::Left)
     }
