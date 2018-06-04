@@ -6,15 +6,11 @@ macro_rules! intrinsics_assume {
     ($x:expr) => {}; //    ($x: expr) => {::std::intrinsics::assume($x);};
 }
 
+/// A growable forest type.
+///
 #[derive(Clone, Default)]
 pub struct Forest<T> {
     data: Vec<ForestEntry<T>>,
-}
-
-impl<T> Forest<T> {
-    pub fn new() -> Self {
-        Forest { data: Vec::new() }
-    }
 }
 
 impl<T> AsRef<forest<T>> for Forest<T> {
@@ -30,6 +26,10 @@ impl<T> AsMut<forest<T>> for Forest<T> {
 }
 
 impl<T> Forest<T> {
+    pub fn new() -> Self {
+        Forest { data: Vec::new() }
+    }
+
     pub fn get_first_root_node(&self) -> Option<node> {
         self.seek_entry(SeekPos::TopFirst).into_opt_node()
     }
@@ -70,9 +70,7 @@ impl<T> Forest<T> {
         let cur_entry = self.data.get(cur_idx).unwrap();
         cur_entry.child_last.into_opt_node()
     }
-}
 
-impl<T> Forest<T> {
     fn check_node_not_equal_or_ancestor_of_another(&self, a: node, b: node) -> bool {
         let target_idx = self.check_node_validity(a);
         let mut cur_idx = self.check_node_validity(b);
@@ -177,9 +175,7 @@ impl<T> Forest<T> {
         }
         self.reconnect_prev_next(new_prev, cur, new_next);
     }
-}
 
-impl<T> Forest<T> {
     pub fn create_node(&mut self, t: T) -> node {
         self.prepare_new_node_at_top_last(t)
     }

@@ -6,6 +6,9 @@ use std::mem;
 
 const CURSOR_INVALID_POS: usize = ::std::usize::MAX;
 
+/// A marker for a position in a `forest`.
+///
+/// It is a `Copy` type, and very cheap to move around.
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct node(usize);
 
@@ -67,6 +70,7 @@ impl<T> ForestEntry<T> {
     }
 }
 
+/// A dynamic sized type representing a forest with a contiguous region.
 pub struct forest<T> {
     data: [ForestEntry<T>],
 }
@@ -181,12 +185,22 @@ impl IterMovement {
     }
 }
 
+/// Immutable forest bidirectional iterator and navigator.
+///
+/// It returns both some movement information and borrowed node value as item.
+/// The movement information can be used to reconstruct this forest.
+/// You can call `value` on this iterator to filter out the movement information.
 pub struct Iter<'a, T: 'a> {
     data: &'a forest<T>,
     mode: IterMode,
     cursor: (node, bool),
 }
 
+/// Mutable forest bidirectional iterator and navigator.
+///
+/// It returns both some movement information and borrowed node value as item.
+/// The movement information can be used to reconstruct this forest.
+/// You can call `value` on this iterator to filter out the movement information.
 pub struct IterMut<'a, T: 'a> {
     data: &'a mut forest<T>,
     mode: IterMode,
@@ -558,6 +572,7 @@ impl<'a, T> Navigator for IterMut<'a, T> {
     }
 }
 
+/// Helper iterator that returns only the borrowed node value.
 #[derive(Clone)]
 pub struct Values<V, T> {
     iter: T,

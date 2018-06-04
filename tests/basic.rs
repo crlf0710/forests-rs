@@ -110,5 +110,4 @@ fn basic_forest_005() {
     ];
     let actual_output: Vec<(_, _)> = forest.iter().mode(IterMode::PostOrder).collect::<Vec<_>>();
     assert_eq!(expected_output.as_slice(), actual_output.as_slice());
-
 }
